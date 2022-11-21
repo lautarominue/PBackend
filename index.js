@@ -1,102 +1,46 @@
-const express = require("express");
-const Productos = require("./Productos");
-const listaDeProductos = new Productos("./productos.txt");
-const app = express();
+const express = require('express')
+const app = express()
+const multer = require("multer");
+const PORT = 8080
+const server = app.listen(PORT, ()=> console.log(`server listen on PORT ${PORT}`))
+server.on('error',err => console.log(`Error: ${err}`))
+
+app.use(express.json())
+app.use(express.urlencoded({extended:true}))
+app.use(express.static(__dirname+'/public'))
+app.use(express.static(__dirname+'/uploads'))
 
 
-// FUNCIÓN PARA TRAER TODOS LOS PRODUCTOS
-const getProducts = async () => {
-    const allCurrentObjects = await listaDeProductos.getAll();
-    return allCurrentObjects;
-};
-
-// FUNCIÓN PARA TRAER UN SOLO PRODUCTO POR ID
-const getProductsByID = async (idProductoRandom) => {
-    const producto = await listaDeProductos.getById(idProductoRandom);
-    return producto;
-};
-
-// VISTA DE PÁGINA PRINCIPAL
-app.get("/", (req, res) => {
-    res.send(`
-    <h1 style="color: gray; text-align:center;">Bienvenidos al servidor Express De Lautaro</h1>
-    <a href="/productos">Mirar todos los productos</a>
-    <br>
-    <a href="/productoRandom">Mirar un producto al azar</a>
-    `);
-});
-
-// VISTA DE TODOS LOS PRODUCTOS
-app.get("/productos", (req, res) => {
-    try {
-        getProducts()
-            .then((info) => {
-                const infoJSON = JSON.stringify(info);
-                const arrayProductos = []
-                // res.send(`res: ${infoJSON}`)
-                console.log(`res: ${infoJSON}`)
-                info.forEach(element => {
-                    arrayProductos.push(`
-                    <div>
-                        <span>${element.id}: ${element.title} - Precio: $${element.price}</span>
-                    </div>
-                `)                 
-                });
-                arrayProductos.push(`<a href="/">Home</a>`)                 
-                res.send(arrayProductos.toLocaleString())
-            })
-            .catch((error) => console.log(error))
-            .finally(() => console.log("Terminado"))
-    } catch (e) {
-        res.send({
-            error: true
-        });
+// CONFIGURADO MULTER
+const myStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads')
+    },
+    filename: (req, file, cb ) =>{
+        const filename = `${Date.now()}-${file.originalname}`
+        cb(null,filename)
     }
-});
+})
+// EJECUCION PARA TABAJAR LOCALMENTE EL MULTER
+const upload = multer({storage: myStorage})
 
-// VISTA DE UN PRODUCTO AL AZAR
-app.get("/productoRandom", (req, res) => {
-    const random = Math.random() * 5 + 1;
-    idProductoRandom = parseInt(random);
-    try {
-        getProductsByID(idProductoRandom)
-            .then((info) => {
-                const infoJSON = JSON.stringify(info);
-                console.log(`res: ${infoJSON}`)
-                res.send(`
-                <table>
-                    <caption>Producto Random</caption>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nombre</th>
-                        <th>Precio</th>
-                    </tr>
-                    <tr>
-                        <td>${info.id}</td>
-                        <td>${info.title}</td>
-                        <td>${info.price}</td>
-                    </tr>
-                </table>
-                <a href="/">Home</a>
-                `)
-                
-            })
-            .catch((error) => console.log(error))
-            .finally(() => console.log("Terminado"))
-    } catch (e) {
-        res.send({
-            error: true
-        })
+
+app.post('/uploadfile', upload.single('myFile'),(req,res)=>{
+    const file = req.file
+    console.log(file)
+    if(!file){
+        return res.status(404).send('Error subiendo archivos')
     }
+    res.status(200).json({
+        status:'Archivo subido correctamente! ',
+        link:__dirname + '/uploads/'+file.filename
+    })
+})
 
-});
 
-const server = app.listen(8080, () => {
-    console.log("Servidor iniciado");
-});
 
-server.on("error", (error) => {
-    console.error(`Error: ${error}`);
-});
 
+
+const routerProductos = require('./routes/productos.js')
+app.use('/api/productos',routerProductos)
 
